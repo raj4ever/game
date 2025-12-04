@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 interface ARCameraProps {
   code: string;
   onClose: () => void;
+  onError?: () => void;
 }
 
-export default function ARCamera({ code, onClose }: ARCameraProps) {
+export default function ARCamera({ code, onClose, onError }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -57,25 +58,58 @@ export default function ARCamera({ code, onClose }: ARCameraProps) {
           }
         }
 
-        if (stream && videoRef.current) {
-          videoRef.current.srcObject = stream;
+        if (stream) {
           streamRef.current = stream;
           
-          // Wait for video to be ready
-          videoRef.current.onloadedmetadata = () => {
+          // Wait a bit for video element to be ready
+          const setupVideo = () => {
             if (videoRef.current) {
-              videoRef.current.play().then(() => {
-                setIsLoading(false);
+              videoRef.current.srcObject = stream;
+              
+              // Wait for video to be ready
+              videoRef.current.onloadedmetadata = () => {
+                if (videoRef.current) {
+                  videoRef.current.play().then(() => {
+                    setIsLoading(false);
               }).catch((playError) => {
                 console.error('Video play error:', playError);
-                setError('Camera started but video playback failed. Please try again.');
+                setError('Camera started but video playback failed. Switching to scratch card...');
                 setIsLoading(false);
+                // Switch to scratch card after showing error
+                if (onError) {
+                  setTimeout(() => {
+                    onError();
+                  }, 2000);
+                }
               });
+                }
+              };
+              
+              // Handle video errors
+              videoRef.current.onerror = () => {
+                setError('Video element error. Switching to scratch card...');
+                setIsLoading(false);
+                if (onError) {
+                  setTimeout(() => {
+                    onError();
+                  }, 2000);
+                }
+              };
+            } else {
+              // Retry after a short delay if video element not ready
+              setTimeout(setupVideo, 100);
             }
           };
+          
+          setupVideo();
         } else {
-          setError('Camera stream received but video element not available.');
+          setError('Camera stream not available. Switching to scratch card...');
           setIsLoading(false);
+          if (onError) {
+            setTimeout(() => {
+              onError();
+            }, 2000);
+          }
         }
       } catch (err: any) {
         let errorMessage = 'Camera access denied. Please allow camera permission.';
@@ -93,6 +127,13 @@ export default function ARCamera({ code, onClose }: ARCameraProps) {
         setError(errorMessage);
         setIsLoading(false);
         console.error('Camera error:', err);
+        
+        // Call onError callback to switch to scratch card
+        if (onError) {
+          setTimeout(() => {
+            onError();
+          }, 2000); // Show error for 2 seconds then switch
+        }
       }
     };
 

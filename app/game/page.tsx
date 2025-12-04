@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import ARCamera from '../components/ARCamera';
+import ScratchCard from '../components/ScratchCard';
 import { calculateDistance, formatDistance, LocationSmoother } from '../utils/location';
 
 // Default target coordinates
@@ -43,7 +44,9 @@ export default function GamePage() {
   const [distance, setDistance] = useState<number | null>(null);
   const [hasReached, setHasReached] = useState(false);
   const [showScratchCard, setShowScratchCard] = useState(false);
+  const [showAR, setShowAR] = useState(false);
   const [code, setCode] = useState<string>('');
+  const [useScratchCard, setUseScratchCard] = useState(false);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
@@ -175,16 +178,34 @@ export default function GamePage() {
 
 
   const handleRevealClick = () => {
-    if (hasReached && !showScratchCard) {
+    if (hasReached && !showScratchCard && !showAR) {
       const newCode = generateCode();
       setCode(newCode);
-      setShowScratchCard(true);
+      // Try AR Camera first
+      setShowAR(true);
     }
   };
 
   const handleCloseAR = () => {
-    setShowScratchCard(false);
-    setCode('');
+    setShowAR(false);
+    // If AR failed, show scratch card as fallback
+    if (code) {
+      setUseScratchCard(true);
+      setShowScratchCard(true);
+    } else {
+      setCode('');
+    }
+  };
+
+  const handleARError = () => {
+    // AR failed, switch to scratch card
+    setShowAR(false);
+    setUseScratchCard(true);
+    setShowScratchCard(true);
+  };
+
+  const handleScratchReveal = () => {
+    // Code revealed in scratch card
   };
 
   const handleOpenGoogleMaps = () => {
@@ -309,7 +330,7 @@ export default function GamePage() {
         )}
 
         {/* Reach Status */}
-        {hasReached && !showScratchCard && (
+        {hasReached && !showScratchCard && !showAR && (
           <div className="bg-green-500 text-white rounded-2xl p-6 mb-6 shadow-xl text-center">
             <p className="text-xl font-bold mb-4">🎉 You've reached the treasure!</p>
             <button
@@ -325,8 +346,15 @@ export default function GamePage() {
         )}
 
         {/* AR Camera */}
-        {showScratchCard && code && (
-          <ARCamera code={code} onClose={handleCloseAR} />
+        {showAR && code && (
+          <ARCamera code={code} onClose={handleCloseAR} onError={handleARError} />
+        )}
+
+        {/* Scratch Card Fallback */}
+        {showScratchCard && code && useScratchCard && (
+          <div className="mb-6">
+            <ScratchCard code={code} onReveal={handleScratchReveal} />
+          </div>
         )}
 
         {/* Location Info (for debugging) */}
