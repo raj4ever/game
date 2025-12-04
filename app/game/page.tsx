@@ -5,8 +5,8 @@ import ARCamera from '../components/ARCamera';
 import { calculateDistance, formatDistance, LocationSmoother } from '../utils/location';
 
 // Default target coordinates
-const DEFAULT_TARGET_LAT = 21.854978;
-const DEFAULT_TARGET_LON = 70.249041;
+const DEFAULT_TARGET_LAT = 21.855204;
+const DEFAULT_TARGET_LON = 70.249010;
 const REACH_DISTANCE = 50; // Distance in meters to consider "reached"
 
 // Generate a random 6-character code
@@ -81,6 +81,7 @@ export default function GamePage() {
           setUserLocation({ lat: smoothed.lat, lon: smoothed.lon });
           setGpsAccuracy(actualAccuracy);
           setIsLoading(false);
+          setError(''); // Clear any previous errors
           
           // Calculate distance using Haversine formula
           const dist = calculateDistance(smoothed.lat, smoothed.lon, targetCoords.lat, targetCoords.lon);
@@ -91,12 +92,30 @@ export default function GamePage() {
           }
         },
         (err) => {
-          setError('Location permission denied. Please enable GPS to play.');
+          let errorMessage = 'Location permission denied. Please enable GPS to play.';
+          
+          // More specific error messages
+          switch(err.code) {
+            case err.PERMISSION_DENIED:
+              errorMessage = 'Location permission denied. Please allow location access in browser settings and refresh the page.';
+              break;
+            case err.POSITION_UNAVAILABLE:
+              errorMessage = 'Location information unavailable. Please check your GPS settings.';
+              break;
+            case err.TIMEOUT:
+              errorMessage = 'Location request timed out. Please try again.';
+              break;
+            default:
+              errorMessage = 'Error getting location. Please check your GPS settings and try again.';
+              break;
+          }
+          
+          setError(errorMessage);
           setIsLoading(false);
         },
         {
           enableHighAccuracy: true,
-          timeout: 15000,
+          timeout: 20000, // Increased timeout
           maximumAge: 0, // Always get fresh data
         }
       );
