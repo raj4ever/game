@@ -234,12 +234,24 @@ export default function GamePage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-400 to-pink-500 p-4">
         <div className="text-center text-white bg-black/30 rounded-2xl p-8 max-w-md">
           <p className="text-xl mb-4">⚠️ {error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-3 bg-white text-purple-600 rounded-full font-bold hover:bg-gray-100 transition"
-          >
-            Try Again
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                setError('');
+                setIsLoading(true);
+                window.location.reload();
+              }}
+              className="w-full px-6 py-3 bg-white text-purple-600 rounded-full font-bold hover:bg-gray-100 transition"
+            >
+              Try Again
+            </button>
+            <p className="text-sm text-white/80 mt-4">
+              💡 Tip: Check browser settings → Site permissions → Location → Allow
+            </p>
+            <p className="text-xs text-white/60 mt-2">
+              Make sure you're using HTTPS (required for GPS)
+            </p>
+          </div>
         </div>
       </div>
     );
