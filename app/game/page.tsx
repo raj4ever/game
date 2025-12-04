@@ -218,10 +218,17 @@ export default function GamePage() {
   };
 
   const handleOpenGoogleMaps = () => {
-    if (userLocation) {
+    if (userLocation && distance !== null) {
       // Open Google Maps with directions
       const origin = `${userLocation.lat},${userLocation.lon}`;
       const destination = `${targetCoords.lat},${targetCoords.lon}`;
+      
+      // Determine mode based on distance
+      // If distance < 1000m (meters), use walking mode
+      // If distance >= 1000m (kilometers), use driving mode
+      const mode = distance < 1000 ? 'walking' : 'driving';
+      const modeCode = distance < 1000 ? 'w' : 'd'; // w = walking, d = driving
+      const webMode = distance < 1000 ? '3e2' : '3e0'; // 3e2 = walking, 3e0 = driving
       
       // Try to open in Google Maps app first, fallback to web
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -229,21 +236,21 @@ export default function GamePage() {
       
       if (isIOS) {
         // iOS - try Google Maps app, fallback to Apple Maps
-        window.open(`comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=walking`, '_blank');
+        window.open(`comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=${mode}`, '_blank');
         // Fallback to Apple Maps if Google Maps app not installed
         setTimeout(() => {
-          window.open(`http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=w`, '_blank');
+          window.open(`http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=${modeCode}`, '_blank');
         }, 500);
       } else if (isAndroid) {
         // Android - open Google Maps
-        window.open(`google.navigation:q=${destination}&mode=w`, '_blank');
+        window.open(`google.navigation:q=${destination}&mode=${modeCode}`, '_blank');
         // Fallback to web if app not available
         setTimeout(() => {
-          window.open(`https://www.google.com/maps/dir/${origin}/${destination}/@${userLocation.lat},${userLocation.lon},15z/data=!4m2!4m1!3e2`, '_blank');
+          window.open(`https://www.google.com/maps/dir/${origin}/${destination}/@${userLocation.lat},${userLocation.lon},15z/data=!4m2!4m1!${webMode}`, '_blank');
         }, 500);
       } else {
         // Desktop/Web - open Google Maps web
-        window.open(`https://www.google.com/maps/dir/${origin}/${destination}/@${userLocation.lat},${userLocation.lon},15z/data=!4m2!4m1!3e2`, '_blank');
+        window.open(`https://www.google.com/maps/dir/${origin}/${destination}/@${userLocation.lat},${userLocation.lon},15z/data=!4m2!4m1!${webMode}`, '_blank');
       }
     }
   };
