@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import ARCamera from '../components/ARCamera';
 import ScratchCard from '../components/ScratchCard';
 import { calculateDistance, formatDistance, LocationSmoother } from '../utils/location';
 
 // Default target coordinates
 const DEFAULT_TARGET_LAT = 21.855204;
 const DEFAULT_TARGET_LON = 70.249010;
+// Second location coordinates (after code entry)
+const SECOND_LOCATION_LAT = 21.741518;
+const SECOND_LOCATION_LON = 70.277832;
 const REACH_DISTANCE = 50; // Distance in meters to consider "reached"
 
 // Generate a random 6-character code
@@ -44,9 +46,10 @@ export default function GamePage() {
   const [distance, setDistance] = useState<number | null>(null);
   const [hasReached, setHasReached] = useState(false);
   const [showScratchCard, setShowScratchCard] = useState(false);
-  const [showAR, setShowAR] = useState(false);
   const [code, setCode] = useState<string>('');
-  const [useScratchCard, setUseScratchCard] = useState(false);
+  const [enteredCode, setEnteredCode] = useState<string>('');
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [showCodeInput, setShowCodeInput] = useState(false);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
@@ -178,34 +181,40 @@ export default function GamePage() {
 
 
   const handleRevealClick = () => {
-    if (hasReached && !showScratchCard && !showAR) {
+    if (hasReached && !showScratchCard) {
       const newCode = generateCode();
       setCode(newCode);
-      // Try AR Camera first
-      setShowAR(true);
-    }
-  };
-
-  const handleCloseAR = () => {
-    setShowAR(false);
-    // If AR failed, show scratch card as fallback
-    if (code) {
-      setUseScratchCard(true);
       setShowScratchCard(true);
-    } else {
-      setCode('');
     }
-  };
-
-  const handleARError = () => {
-    // AR failed, switch to scratch card
-    setShowAR(false);
-    setUseScratchCard(true);
-    setShowScratchCard(true);
   };
 
   const handleScratchReveal = () => {
-    // Code revealed in scratch card
+    // Code revealed in scratch card, show code input
+    setShowCodeInput(true);
+  };
+
+  const handleCodeSubmit = () => {
+    // Verify code (case insensitive)
+    if (enteredCode.toUpperCase().trim() === code.toUpperCase().trim()) {
+      setCodeVerified(true);
+      setShowCodeInput(false);
+      // Set second location as target
+      setTargetCoords({
+        lat: SECOND_LOCATION_LAT,
+        lon: SECOND_LOCATION_LON,
+      });
+      // Save to localStorage
+      localStorage.setItem('targetLat', SECOND_LOCATION_LAT.toString());
+      localStorage.setItem('targetLon', SECOND_LOCATION_LON.toString());
+      // Reset states for second location
+      setHasReached(false);
+      setShowScratchCard(false);
+      setCode('');
+      setEnteredCode('');
+    } else {
+      setError('Invalid code! Please try again.');
+      setTimeout(() => setError(''), 3000);
+    }
   };
 
   const handleOpenGoogleMaps = () => {
@@ -330,30 +339,59 @@ export default function GamePage() {
         )}
 
         {/* Reach Status */}
-        {hasReached && !showScratchCard && !showAR && (
+        {hasReached && !showScratchCard && !codeVerified && (
           <div className="bg-green-500 text-white rounded-2xl p-6 mb-6 shadow-xl text-center">
             <p className="text-xl font-bold mb-4">🎉 You've reached the treasure!</p>
             <button
               onClick={handleRevealClick}
-              className="w-full py-4 bg-white text-green-600 rounded-xl font-bold text-lg hover:bg-gray-100 transition shadow-lg flex items-center justify-center gap-2"
+              className="w-full py-4 bg-white text-green-600 rounded-xl font-bold text-lg hover:bg-gray-100 transition shadow-lg"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              Open AR Camera
+              Click to Reveal Code
             </button>
           </div>
         )}
 
-        {/* AR Camera */}
-        {showAR && code && (
-          <ARCamera code={code} onClose={handleCloseAR} onError={handleARError} />
-        )}
-
-        {/* Scratch Card Fallback */}
-        {showScratchCard && code && useScratchCard && (
+        {/* Scratch Card */}
+        {showScratchCard && code && (
           <div className="mb-6">
             <ScratchCard code={code} onReveal={handleScratchReveal} />
+          </div>
+        )}
+
+        {/* Code Input */}
+        {showCodeInput && (
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 mb-6 shadow-xl">
+            <div className="text-center">
+              <p className="text-lg font-semibold text-gray-800 mb-2">Enter Your Code</p>
+              <p className="text-sm text-gray-600 mb-4">Enter the code you found to unlock the next location</p>
+              <input
+                type="text"
+                value={enteredCode}
+                onChange={(e) => setEnteredCode(e.target.value.toUpperCase())}
+                placeholder="Enter 6-digit code"
+                maxLength={6}
+                className="w-full px-4 py-3 text-center text-2xl font-bold tracking-widest border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none mb-4"
+                autoFocus
+              />
+              <button
+                onClick={handleCodeSubmit}
+                className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold text-lg hover:bg-purple-700 transition shadow-lg"
+              >
+                Verify Code
+              </button>
+              {error && (
+                <p className="text-red-600 text-sm mt-2">{error}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Code Verified - Second Location */}
+        {codeVerified && (
+          <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-6 mb-6 shadow-xl text-center">
+            <p className="text-2xl font-bold mb-2">✅ Code Verified!</p>
+            <p className="text-lg mb-4">New location unlocked! Navigate to the next treasure.</p>
+            <p className="text-sm opacity-90">New target: {SECOND_LOCATION_LAT.toFixed(6)}, {SECOND_LOCATION_LON.toFixed(6)}</p>
           </div>
         )}
 
