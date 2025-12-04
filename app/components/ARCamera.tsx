@@ -14,24 +14,83 @@ export default function ARCamera({ code, onClose }: ARCameraProps) {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
+    // Check if camera is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError('Camera is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.');
+      setIsLoading(false);
+      return;
+    }
+
     // Request camera access
     const startCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment', // Use back camera on mobile
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-        });
+        // Try back camera first (for mobile), fallback to any camera
+        let stream: MediaStream | null = null;
+        
+        try {
+          // First try: back camera (environment) - for mobile devices
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          });
+        } catch (envError) {
+          // Fallback: any available camera (for PC/desktop)
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: 'user', // Front camera or default
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+            });
+          } catch (userError) {
+            // Last fallback: any camera without facingMode constraint
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+            });
+          }
+        }
 
-        if (videoRef.current) {
+        if (stream && videoRef.current) {
           videoRef.current.srcObject = stream;
           streamRef.current = stream;
+          
+          // Wait for video to be ready
+          videoRef.current.onloadedmetadata = () => {
+            if (videoRef.current) {
+              videoRef.current.play().then(() => {
+                setIsLoading(false);
+              }).catch((playError) => {
+                console.error('Video play error:', playError);
+                setError('Camera started but video playback failed. Please try again.');
+                setIsLoading(false);
+              });
+            }
+          };
+        } else {
+          setError('Camera stream received but video element not available.');
           setIsLoading(false);
         }
-      } catch (err) {
-        setError('Camera access denied. Please allow camera permission.');
+      } catch (err: any) {
+        let errorMessage = 'Camera access denied. Please allow camera permission.';
+        
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          errorMessage = 'Camera permission denied. Please allow camera access in browser settings and refresh.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          errorMessage = 'No camera found. Please connect a camera and try again.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          errorMessage = 'Camera is being used by another application. Please close other apps using the camera.';
+        } else if (err.name === 'OverconstrainedError') {
+          errorMessage = 'Camera constraints not supported. Trying with default settings...';
+        }
+        
+        setError(errorMessage);
         setIsLoading(false);
         console.error('Camera error:', err);
       }
@@ -70,12 +129,20 @@ export default function ARCamera({ code, onClose }: ARCameraProps) {
       <div className="fixed inset-0 bg-black z-50 flex items-center justify-center p-4">
         <div className="text-center text-white bg-red-600/90 rounded-2xl p-8 max-w-md">
           <p className="text-xl mb-4">⚠️ {error}</p>
-          <button
-            onClick={handleClose}
-            className="px-6 py-3 bg-white text-red-600 rounded-full font-bold hover:bg-gray-100 transition"
-          >
-            Close
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={handleClose}
+              className="w-full px-6 py-3 bg-white text-red-600 rounded-full font-bold hover:bg-gray-100 transition"
+            >
+              Close
+            </button>
+            <p className="text-sm text-white/80 mt-4">
+              💡 Tip: Check browser settings → Site permissions → Camera → Allow
+            </p>
+            <p className="text-xs text-white/60">
+              Make sure you're using HTTPS and have granted camera permission
+            </p>
+          </div>
         </div>
       </div>
     );
