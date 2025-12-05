@@ -197,6 +197,12 @@ export async function updateLocation(id: string, updates: {
 // Set active location (deactivate others, activate this one)
 export async function setActiveLocation(id: string) {
   try {
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('You must be logged in to set active location');
+    }
+
     // First, deactivate all locations
     const { error: deactivateError } = await supabase
       .from('locations')
@@ -218,6 +224,10 @@ export async function setActiveLocation(id: string) {
 
     if (error) {
       console.error('Error activating location:', error);
+      // More detailed error message
+      if (error.code === 'PGRST301' || error.message.includes('permission')) {
+        throw new Error('Permission denied. Make sure you are logged in and have permission to update locations.');
+      }
       throw new Error(`Failed to set active location: ${error.message}`);
     }
 

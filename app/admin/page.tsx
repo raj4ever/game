@@ -99,13 +99,25 @@ export default function AdminPage() {
     }
   };
 
-  const handleSetActive = async (locationId: string) => {
+  const handleSetActive = async (locationId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setError('');
     setIsLoading(true);
     try {
-      await setActiveLocation(locationId);
+      console.log('Setting active location:', locationId);
+      const result = await setActiveLocation(locationId);
+      console.log('Active location set:', result);
       setError(''); // Clear any previous errors
-      await loadLocations(); // Reload to show updated state
+      // Force reload locations
+      await loadLocations();
+      // Also refresh the page state
+      setLocations(prev => prev.map(loc => ({
+        ...loc,
+        active: loc.id === locationId
+      })));
     } catch (err: any) {
       console.error('Set active error:', err);
       setError(err.message || 'Failed to set active location. Make sure you are logged in.');
@@ -288,10 +300,12 @@ export default function AdminPage() {
                       <div>
                         {!loc.active && (
                           <button
-                            onClick={() => handleSetActive(loc.id)}
-                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+                            type="button"
+                            onClick={(e) => handleSetActive(loc.id, e)}
+                            disabled={isLoading}
+                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Set Active
+                            {isLoading ? 'Setting...' : 'Set Active'}
                           </button>
                         )}
                       </div>
