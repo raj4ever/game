@@ -22,6 +22,8 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [locations, setLocations] = useState<any[]>([]);
   const [activeLocation, setActiveLocation] = useState<any>(null);
+  const [email, setEmail] = useState('raj4everwap@gmail.com');
+  const [password, setPassword] = useState('R@J4ever');
 
   // Check if already authenticated
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function AdminPage() {
     setIsLoading(true);
     
     try {
-      await adminLogin('raj4everwap@gmail.com', 'R@J4ever');
+      await adminLogin(email, password);
       setIsAuthenticated(true);
       await loadLocations();
     } catch (err: any) {
@@ -101,10 +103,16 @@ export default function AdminPage() {
     setError('');
     setIsLoading(true);
     try {
-      await setActiveLocation(locationId);
-      await loadLocations();
+      const result = await setActiveLocation(locationId);
+      if (result) {
+        setError(''); // Clear any previous errors
+        await loadLocations(); // Reload to show updated state
+      } else {
+        setError('Failed to set active location. Please try again.');
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to set active location');
+      console.error('Set active error:', err);
+      setError(err.message || 'Failed to set active location. Make sure you are logged in.');
     } finally {
       setIsLoading(false);
     }
@@ -134,7 +142,8 @@ export default function AdminPage() {
                   </label>
                   <input
                     type="email"
-                    defaultValue="admin@srv1178811.hstgr.cloud"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     required
                   />
@@ -145,7 +154,8 @@ export default function AdminPage() {
                   </label>
                   <input
                     type="password"
-                    defaultValue="R@J4evergmail"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     required
                   />

@@ -203,10 +203,15 @@ export async function updateLocation(id: string, updates: {
 export async function setActiveLocation(id: string) {
   try {
     // First, deactivate all locations
-    await supabase
+    const { error: deactivateError } = await supabase
       .from('locations')
       .update({ active: false })
       .eq('active', true);
+
+    if (deactivateError) {
+      console.error('Error deactivating locations:', deactivateError);
+      // Continue anyway - might be no active locations
+    }
 
     // Then activate the selected location
     const { data, error } = await supabase
@@ -217,11 +222,16 @@ export async function setActiveLocation(id: string) {
       .single();
 
     if (error) {
-      throw error;
+      console.error('Error activating location:', error);
+      throw new Error(`Failed to set active location: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error('Location not found');
     }
 
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error setting active location:', error);
     throw error;
   }
