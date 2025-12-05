@@ -103,13 +103,9 @@ export default function AdminPage() {
     setError('');
     setIsLoading(true);
     try {
-      const result = await setActiveLocation(locationId);
-      if (result) {
-        setError(''); // Clear any previous errors
-        await loadLocations(); // Reload to show updated state
-      } else {
-        setError('Failed to set active location. Please try again.');
-      }
+      await setActiveLocation(locationId);
+      setError(''); // Clear any previous errors
+      await loadLocations(); // Reload to show updated state
     } catch (err: any) {
       console.error('Set active error:', err);
       setError(err.message || 'Failed to set active location. Make sure you are logged in.');

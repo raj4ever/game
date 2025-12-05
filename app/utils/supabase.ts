@@ -33,13 +33,8 @@ export async function adminLogin(email: string, password: string) {
       throw error;
     }
 
-    // Store session in localStorage
-    if (data.session) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('supabase_auth_token', data.session.access_token);
-      }
-    }
-
+    // Session is automatically stored by Supabase client
+    // No need to manually store token
     return data;
   } catch (error: any) {
     console.error('Admin login error:', error);
