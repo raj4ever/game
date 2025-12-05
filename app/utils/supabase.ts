@@ -235,6 +235,7 @@ export async function updateLocation(id: string, updates: {
   name?: string;
   active?: boolean;
   winning_amount?: number;
+  minimum_team_size?: number;
 }) {
   try {
     const { data, error } = await supabase
