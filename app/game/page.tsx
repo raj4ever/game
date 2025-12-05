@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ScratchCard from '../components/ScratchCard';
 import { calculateDistance, formatDistance, LocationSmoother } from '../utils/location';
+import { getActiveLocation, verifyCode, generateCodeForLocation } from '../utils/pocketbase';
 
 // Default target coordinates
 const DEFAULT_TARGET_LAT = 21.855204;
@@ -23,25 +24,8 @@ function generateCode(): string {
 }
 
 export default function GamePage() {
-  // Get target coordinates from localStorage or use defaults
-  const getTargetCoordinates = () => {
-    if (typeof window !== 'undefined') {
-      const savedLat = localStorage.getItem('targetLat');
-      const savedLon = localStorage.getItem('targetLon');
-      if (savedLat && savedLon) {
-        return {
-          lat: parseFloat(savedLat),
-          lon: parseFloat(savedLon),
-        };
-      }
-    }
-    return {
-      lat: DEFAULT_TARGET_LAT,
-      lon: DEFAULT_TARGET_LON,
-    };
-  };
-
-  const [targetCoords, setTargetCoords] = useState(getTargetCoordinates());
+  const [targetCoords, setTargetCoords] = useState({ lat: DEFAULT_TARGET_LAT, lon: DEFAULT_TARGET_LON });
+  const [currentLocationId, setCurrentLocationId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
   const [hasReached, setHasReached] = useState(false);
@@ -56,20 +40,27 @@ export default function GamePage() {
   const watchIdRef = useRef<number | null>(null);
   const locationSmootherRef = useRef(new LocationSmoother());
 
-  // Update target coordinates when localStorage changes
+  // Load target coordinates from PocketBase
   useEffect(() => {
-    const handleStorageChange = () => {
-      setTargetCoords(getTargetCoordinates());
+    const loadLocation = async () => {
+      try {
+        const location = await getActiveLocation();
+        if (location) {
+          setTargetCoords({ lat: location.lat, lon: location.lon });
+          setCurrentLocationId(location.id);
+        }
+      } catch (error) {
+        console.error('Error loading location:', error);
+        // Fallback to defaults
+        setTargetCoords({ lat: DEFAULT_TARGET_LAT, lon: DEFAULT_TARGET_LON });
+      }
     };
-    window.addEventListener('storage', handleStorageChange);
-    // Also check periodically in case same tab updates
-    const interval = setInterval(() => {
-      setTargetCoords(getTargetCoordinates());
-    }, 1000);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    
+    loadLocation();
+    
+    // Refresh location every 30 seconds
+    const interval = setInterval(loadLocation, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -180,11 +171,20 @@ export default function GamePage() {
   }, [targetCoords.lat, targetCoords.lon, hasReached]);
 
 
-  const handleRevealClick = () => {
-    if (hasReached && !showScratchCard) {
-      const newCode = generateCode();
-      setCode(newCode);
-      setShowScratchCard(true);
+  const handleRevealClick = async () => {
+    if (hasReached && !showScratchCard && currentLocationId) {
+      try {
+        // Generate code in PocketBase
+        const newCode = await generateCodeForLocation(currentLocationId);
+        setCode(newCode);
+        setShowScratchCard(true);
+      } catch (error) {
+        // Fallback to local code generation
+        const newCode = generateCode();
+        setCode(newCode);
+        setShowScratchCard(true);
+        console.error('Error generating code:', error);
+      }
     }
   };
 
@@ -193,27 +193,67 @@ export default function GamePage() {
     setShowCodeInput(true);
   };
 
-  const handleCodeSubmit = () => {
-    // Verify code (case insensitive)
-    if (enteredCode.toUpperCase().trim() === code.toUpperCase().trim()) {
-      setCodeVerified(true);
-      setShowCodeInput(false);
-      // Set second location as target
-      setTargetCoords({
-        lat: SECOND_LOCATION_LAT,
-        lon: SECOND_LOCATION_LON,
-      });
-      // Save to localStorage
-      localStorage.setItem('targetLat', SECOND_LOCATION_LAT.toString());
-      localStorage.setItem('targetLon', SECOND_LOCATION_LON.toString());
-      // Reset states for second location
-      setHasReached(false);
-      setShowScratchCard(false);
-      setCode('');
-      setEnteredCode('');
-    } else {
-      setError('Invalid code! Please try again.');
-      setTimeout(() => setError(''), 3000);
+  const handleCodeSubmit = async () => {
+    if (!currentLocationId) {
+      setError('Location not loaded. Please refresh the page.');
+      return;
+    }
+
+    try {
+      // Verify code with PocketBase
+      const nextLocation = await verifyCode(enteredCode.toUpperCase().trim(), currentLocationId);
+      
+      if (nextLocation) {
+        // Code verified, move to next location
+        setCodeVerified(true);
+        setShowCodeInput(false);
+        setTargetCoords({
+          lat: nextLocation.lat,
+          lon: nextLocation.lon,
+        });
+        setCurrentLocationId(nextLocation.id);
+        // Reset states for next location
+        setHasReached(false);
+        setShowScratchCard(false);
+        setCode('');
+        setEnteredCode('');
+      } else {
+        // Fallback: check local code
+        if (enteredCode.toUpperCase().trim() === code.toUpperCase().trim()) {
+          setCodeVerified(true);
+          setShowCodeInput(false);
+          // Use second location as fallback
+          setTargetCoords({
+            lat: SECOND_LOCATION_LAT,
+            lon: SECOND_LOCATION_LON,
+          });
+          setHasReached(false);
+          setShowScratchCard(false);
+          setCode('');
+          setEnteredCode('');
+        } else {
+          setError('Invalid code! Please try again.');
+          setTimeout(() => setError(''), 3000);
+        }
+      }
+    } catch (error) {
+      console.error('Error verifying code:', error);
+      // Fallback to local verification
+      if (enteredCode.toUpperCase().trim() === code.toUpperCase().trim()) {
+        setCodeVerified(true);
+        setShowCodeInput(false);
+        setTargetCoords({
+          lat: SECOND_LOCATION_LAT,
+          lon: SECOND_LOCATION_LON,
+        });
+        setHasReached(false);
+        setShowScratchCard(false);
+        setCode('');
+        setEnteredCode('');
+      } else {
+        setError('Invalid code! Please try again.');
+        setTimeout(() => setError(''), 3000);
+      }
     }
   };
 

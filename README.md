@@ -6,8 +6,10 @@ A location-based treasure hunt game built with Next.js. Find hidden treasures us
 
 - 📍 Real-time GPS tracking
 - 📏 Accurate distance calculation using Haversine formula
-- 🗺️ Open directions in Google Maps app/web
-- 📷 AR camera for code reveal
+- 🗺️ Smart Google Maps integration (walking for <1km, driving for >=1km)
+- 🎴 Scratch card code reveal system
+- 🔐 PocketBase database integration for production
+- 👨‍💼 Admin panel for managing locations
 - 📱 Mobile-friendly (iPhone & Android)
 - 🔐 HTTPS support for GPS access
 
@@ -19,7 +21,22 @@ A location-based treasure hunt game built with Next.js. Find hidden treasures us
 npm install
 ```
 
-### 2. Run Development Server
+### 2. Setup PocketBase (Production)
+
+For production database:
+
+1. Create `.env.local` file:
+```bash
+NEXT_PUBLIC_POCKETBASE_URL=http://72.61.235.215:8090
+```
+
+2. Setup PocketBase collections (see [POCKETBASE_SETUP.md](./POCKETBASE_SETUP.md))
+
+3. Admin credentials:
+   - Email: `admin@srv1178811.hstgr.cloud`
+   - Password: `R@J4evergmail`
+
+### 3. Run Development Server
 
 For HTTP (localhost only):
 ```bash
@@ -33,7 +50,7 @@ npm run dev:https
 
 The HTTPS server will automatically create self-signed certificates on first run.
 
-### 3. Access the App
+### 4. Access the App
 
 - **Local:** http://localhost:3000 (or https://localhost:3000 for HTTPS)
 - **Network:** https://[YOUR_IP]:3000 (for mobile devices)
@@ -42,7 +59,10 @@ The HTTPS server will automatically create self-signed certificates on first run
 
 ## Usage
 
-1. **Admin Panel** (`/admin`): Set target coordinates for the treasure
+1. **Admin Panel** (`/admin`): 
+   - Login with PocketBase credentials
+   - Set target coordinates for the treasure
+   - Manage multiple locations
 2. **Game Page** (`/game`): 
    - Allow GPS permission
    - Navigate to the target location
