@@ -227,7 +227,7 @@ export async function setActiveLocation(id: string) {
       .update({ active: true })
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle(); // Use maybeSingle to handle cases gracefully
 
     if (error) {
       console.error('Error activating location:', error);
