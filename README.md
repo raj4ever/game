@@ -8,7 +8,7 @@ A location-based treasure hunt game built with Next.js. Find hidden treasures us
 - 📏 Accurate distance calculation using Haversine formula
 - 🗺️ Smart Google Maps integration (walking for <1km, driving for >=1km)
 - 🎴 Scratch card code reveal system
-- 🔐 PocketBase database integration for production
+- 🔐 Supabase database integration for production
 - 👨‍💼 Admin panel for managing locations
 - 📱 Mobile-friendly (iPhone & Android)
 - 🔐 HTTPS support for GPS access
@@ -21,20 +21,21 @@ A location-based treasure hunt game built with Next.js. Find hidden treasures us
 npm install
 ```
 
-### 2. Setup PocketBase (Production)
+### 2. Setup Supabase (Production)
 
 For production database:
 
-1. Create `.env.local` file:
+1. Create a Supabase project at [supabase.com](https://supabase.com)
+
+2. Create `.env.local` file:
 ```bash
-NEXT_PUBLIC_POCKETBASE_URL=http://72.61.235.215:8090
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 ```
 
-2. Setup PocketBase collections (see [POCKETBASE_SETUP.md](./POCKETBASE_SETUP.md))
+3. Setup Supabase tables (see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md))
 
-3. Admin credentials:
-   - Email: `admin@srv1178811.hstgr.cloud`
-   - Password: `R@J4evergmail`
+4. Create admin user in Supabase Authentication dashboard
 
 ### 3. Run Development Server
 

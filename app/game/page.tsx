@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ScratchCard from '../components/ScratchCard';
 import { calculateDistance, formatDistance, LocationSmoother } from '../utils/location';
-import { getActiveLocation, verifyCode, generateCodeForLocation } from '../utils/pocketbase';
+import { getActiveLocation, verifyCode, generateCodeForLocation } from '../utils/supabase';
 
 // Default target coordinates
 const DEFAULT_TARGET_LAT = 21.855204;
@@ -40,7 +40,7 @@ export default function GamePage() {
   const watchIdRef = useRef<number | null>(null);
   const locationSmootherRef = useRef(new LocationSmoother());
 
-  // Load target coordinates from PocketBase
+  // Load target coordinates from Supabase
   useEffect(() => {
     const loadLocation = async () => {
       try {
@@ -174,7 +174,7 @@ export default function GamePage() {
   const handleRevealClick = async () => {
     if (hasReached && !showScratchCard && currentLocationId) {
       try {
-        // Generate code in PocketBase
+        // Generate code in Supabase
         const newCode = await generateCodeForLocation(currentLocationId);
         setCode(newCode);
         setShowScratchCard(true);
@@ -200,7 +200,7 @@ export default function GamePage() {
     }
 
     try {
-      // Verify code with PocketBase
+      // Verify code with Supabase
       const nextLocation = await verifyCode(enteredCode.toUpperCase().trim(), currentLocationId);
       
       if (nextLocation) {

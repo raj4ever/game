@@ -10,8 +10,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.86.2",
     "next": "16.0.7",
-    "pocketbase": "^0.26.5",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },

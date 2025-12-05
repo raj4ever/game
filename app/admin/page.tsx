@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { adminLogin, saveLocation, getAllLocations, getActiveLocation, setAuthToken, clearAuthToken } from '../utils/pocketbase';
+import { 
+  adminLogin, 
+  logout, 
+  checkAuth,
+  createLocation, 
+  updateLocation,
+  setActiveLocation,
+  getAllLocations, 
+  getActiveLocation 
+} from '../utils/supabase';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -16,16 +25,12 @@ export default function AdminPage() {
 
   // Check if already authenticated
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthentication = async () => {
       try {
-        // Check if token exists in localStorage
-        const token = localStorage.getItem('pb_auth_token');
-        if (token) {
-          setAuthToken(token);
-          setIsAuthenticated(true);
+        const isAuth = await checkAuth();
+        setIsAuthenticated(isAuth);
+        if (isAuth) {
           await loadLocations();
-        } else {
-          setIsAuthenticated(false);
         }
       } catch (error) {
         setIsAuthenticated(false);
@@ -33,7 +38,7 @@ export default function AdminPage() {
         setIsLoading(false);
       }
     };
-    checkAuth();
+    checkAuthentication();
   }, []);
 
   const loadLocations = async () => {
@@ -58,11 +63,7 @@ export default function AdminPage() {
     setIsLoading(true);
     
     try {
-      const authData = await adminLogin('admin@srv1178811.hstgr.cloud', 'R@J4evergmail');
-      // Store token in localStorage
-      if (authData.token) {
-        localStorage.setItem('pb_auth_token', authData.token);
-      }
+      await adminLogin('admin@srv1178811.hstgr.cloud', 'R@J4evergmail');
       setIsAuthenticated(true);
       await loadLocations();
     } catch (err: any) {
@@ -73,8 +74,8 @@ export default function AdminPage() {
   };
 
   const handleSave = async () => {
-    if (!lat || !lon) {
-      setError('Please enter both latitude and longitude');
+    if (!lat || !lon || !name) {
+      setError('Please enter location name, latitude, and longitude');
       return;
     }
 
@@ -82,12 +83,28 @@ export default function AdminPage() {
     setIsLoading(true);
 
     try {
-      await saveLocation(lat, lon, name);
+      await createLocation(lat, lon, name);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      setLat('21.855204');
+      setLon('70.249010');
+      setName('First Location');
       await loadLocations();
     } catch (err: any) {
       setError(err.message || 'Failed to save location');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSetActive = async (locationId: string) => {
+    setError('');
+    setIsLoading(true);
+    try {
+      await setActiveLocation(locationId);
+      await loadLocations();
+    } catch (err: any) {
+      setError(err.message || 'Failed to set active location');
     } finally {
       setIsLoading(false);
     }
@@ -162,9 +179,8 @@ export default function AdminPage() {
               🎯 Admin Panel
             </h1>
             <button
-              onClick={() => {
-                clearAuthToken();
-                localStorage.removeItem('pb_auth_token');
+              onClick={async () => {
+                await logout();
                 setIsAuthenticated(false);
               }}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
@@ -261,6 +277,16 @@ export default function AdminPage() {
                           <span className="inline-block mt-1 px-2 py-1 bg-green-600 text-white text-xs rounded">
                             Active
                           </span>
+                        )}
+                      </div>
+                      <div>
+                        {!loc.active && (
+                          <button
+                            onClick={() => handleSetActive(loc.id)}
+                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+                          >
+                            Set Active
+                          </button>
                         )}
                       </div>
                     </div>
