@@ -13,6 +13,40 @@ export default function ScratchCard({ code, onReveal }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isScratchingRef = useRef(false);
 
+  // Helper function to scratch at coordinates
+  const scratchAt = (x: number, y: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || isRevealed) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x, y, 30, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Calculate scratched area (debounced for performance)
+    if (!isRevealed) {
+      requestAnimationFrame(() => {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let transparentPixels = 0;
+        for (let i = 3; i < imageData.data.length; i += 4) {
+          if (imageData.data[i] === 0) {
+            transparentPixels++;
+          }
+        }
+        const progress = (transparentPixels / (canvas.width * canvas.height)) * 100;
+        setScratchProgress(progress);
+
+        if (progress > 50 && !isRevealed) {
+          setIsRevealed(true);
+          onReveal();
+        }
+      });
+    }
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || isRevealed) return;
@@ -46,110 +80,72 @@ export default function ScratchCard({ code, onReveal }: ScratchCardProps) {
     ctx.fillText('Scratch Here!', canvas.width / 2, canvas.height / 2);
   }, [isRevealed]);
 
+  // Native touch event handlers with passive: false
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || isRevealed) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      isScratchingRef.current = true;
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      scratchAt(x, y);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isScratchingRef.current) {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        scratchAt(x, y);
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      isScratchingRef.current = false;
+    };
+
+    // Add native event listeners with passive: false to allow preventDefault
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isRevealed]);
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     isScratchingRef.current = true;
-    scratch(e);
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) {
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      scratchAt(x, y);
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isScratchingRef.current) {
-      scratch(e);
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        scratchAt(x, y);
+      }
     }
   };
 
   const handleMouseUp = () => {
     isScratchingRef.current = false;
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    isScratchingRef.current = true;
-    scratchTouch(e);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (isScratchingRef.current) {
-      scratchTouch(e);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    isScratchingRef.current = false;
-  };
-
-  const scratch = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || isRevealed) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.arc(x, y, 30, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Calculate scratched area (debounced for performance)
-    if (!isRevealed) {
-      requestAnimationFrame(() => {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let transparentPixels = 0;
-        for (let i = 3; i < imageData.data.length; i += 4) {
-          if (imageData.data[i] === 0) {
-            transparentPixels++;
-          }
-        }
-        const progress = (transparentPixels / (canvas.width * canvas.height)) * 100;
-        setScratchProgress(progress);
-
-        if (progress > 50 && !isRevealed) {
-          setIsRevealed(true);
-          onReveal();
-        }
-      });
-    }
-  };
-
-  const scratchTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || isRevealed) return;
-
-    e.preventDefault();
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.arc(x, y, 30, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Calculate scratched area (debounced for performance)
-    if (!isRevealed) {
-      requestAnimationFrame(() => {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let transparentPixels = 0;
-        for (let i = 3; i < imageData.data.length; i += 4) {
-          if (imageData.data[i] === 0) {
-            transparentPixels++;
-          }
-        }
-        const progress = (transparentPixels / (canvas.width * canvas.height)) * 100;
-        setScratchProgress(progress);
-
-        if (progress > 50 && !isRevealed) {
-          setIsRevealed(true);
-          onReveal();
-        }
-      });
-    }
   };
 
   return (
@@ -164,14 +160,11 @@ export default function ScratchCard({ code, onReveal }: ScratchCardProps) {
           {!isRevealed ? (
             <canvas
               ref={canvasRef}
-              className="w-full h-48 rounded-lg cursor-crosshair touch-none"
+              className="w-full h-48 rounded-lg cursor-crosshair"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
               style={{ touchAction: 'none' }}
             />
           ) : (
@@ -195,4 +188,3 @@ export default function ScratchCard({ code, onReveal }: ScratchCardProps) {
     </div>
   );
 }
-

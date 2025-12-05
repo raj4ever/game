@@ -4,15 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:https": "node server-https.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.2",
+    "html5-qrcode": "^2.3.8",
     "next": "16.0.7",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "react-qr-code": "^2.0.18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

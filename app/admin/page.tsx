@@ -8,6 +8,8 @@ import {
   createLocation, 
   updateLocation,
   setActiveLocation,
+  deactivateLocation,
+  deleteLocation,
   getAllLocations, 
   getActiveLocation 
 } from '../utils/supabase';
@@ -18,12 +20,17 @@ export default function AdminPage() {
   const [lat, setLat] = useState('21.855204');
   const [lon, setLon] = useState('70.249010');
   const [name, setName] = useState('First Location');
+  const [winningAmount, setWinningAmount] = useState('0');
+  const [minimumTeamSize, setMinimumTeamSize] = useState('1');
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [locations, setLocations] = useState<any[]>([]);
-  const [activeLocation, setActiveLocation] = useState<any>(null);
+  const [activeLocation, setActiveLocationState] = useState<any>(null);
   const [email, setEmail] = useState('raj4everwap@gmail.com');
   const [password, setPassword] = useState('R@J4ever');
+  const [editingLocation, setEditingLocation] = useState<string | null>(null);
+  const [editWinningAmount, setEditWinningAmount] = useState<string>('');
+  const [editMinimumTeamSize, setEditMinimumTeamSize] = useState<string>('1');
 
   // Check if already authenticated
   useEffect(() => {
@@ -50,7 +57,7 @@ export default function AdminPage() {
       
       const active = await getActiveLocation();
       if (active && active.lat && active.lon) {
-        setActiveLocation(active);
+        setActiveLocationState(active);
         setLat(active.lat.toString());
         setLon(active.lon.toString());
       }
@@ -85,12 +92,16 @@ export default function AdminPage() {
     setIsLoading(true);
 
     try {
-      await createLocation(lat, lon, name);
+      const amount = parseFloat(winningAmount) || 0;
+      const teamSize = parseInt(minimumTeamSize) || 1;
+      await createLocation(lat, lon, name, amount, teamSize);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
       setLat('21.855204');
       setLon('70.249010');
       setName('First Location');
+      setWinningAmount('0');
+      setMinimumTeamSize('1');
       await loadLocations();
     } catch (err: any) {
       setError(err.message || 'Failed to save location');
@@ -107,16 +118,75 @@ export default function AdminPage() {
     setError('');
     setIsLoading(true);
     try {
-      console.log('Setting active location:', locationId);
+      console.log('[Admin] Setting active location:', locationId);
       const result = await setActiveLocation(locationId);
-      console.log('Active location set:', result);
+      console.log('[Admin] Active location set result:', result);
+      console.log('[Admin] Result type:', typeof result);
+      console.log('[Admin] Result value:', JSON.stringify(result));
+      
+      if (!result) {
+        throw new Error('Location activation returned no result. Please try again.');
+      }
       
       setError(''); // Clear any previous errors
       // Force reload locations to get fresh data from database
       await loadLocations();
     } catch (err: any) {
-      console.error('Set active error:', err);
+      console.error('[Admin] Set active error:', err);
+      console.error('[Admin] Error details:', JSON.stringify(err, null, 2));
       setError(err.message || 'Failed to set active location. Make sure you are logged in.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeactivate = async (locationId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setError('');
+    setIsLoading(true);
+    try {
+      console.log('Deactivating location:', locationId);
+      const result = await deactivateLocation(locationId);
+      console.log('Location deactivated:', result);
+      
+      setError(''); // Clear any previous errors
+      await loadLocations();
+    } catch (err: any) {
+      console.error('Deactivate error:', err);
+      setError(err.message || 'Failed to deactivate location. Make sure you are logged in.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async (locationId: string, locationName: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    // Confirm deletion
+    const confirmMessage = `Are you sure you want to delete "${locationName || 'this location'}"? This action cannot be undone.`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setError('');
+    setIsLoading(true);
+    try {
+      console.log('[Admin] Deleting location:', locationId);
+      await deleteLocation(locationId);
+      console.log('[Admin] Location deleted successfully');
+      
+      setError(''); // Clear any previous errors
+      // Force reload locations to get fresh data from database
+      await loadLocations();
+    } catch (err: any) {
+      console.error('[Admin] Delete error:', err);
+      setError(err.message || 'Failed to delete location. Make sure you are logged in.');
     } finally {
       setIsLoading(false);
     }
@@ -255,6 +325,38 @@ export default function AdminPage() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Winning Amount (₹)
+              </label>
+              <input
+                type="number"
+                value={winningAmount}
+                onChange={(e) => setWinningAmount(e.target.value)}
+                placeholder="0"
+                min="0"
+                step="0.01"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">Amount user will win when they complete this location</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Minimum Team Size
+              </label>
+              <input
+                type="number"
+                value={minimumTeamSize}
+                onChange={(e) => setMinimumTeamSize(e.target.value)}
+                placeholder="1"
+                min="1"
+                step="1"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                1 = Single player, 2 = Team of 2 required, 4 = Team of 4 required, etc.
+              </p>
+            </div>
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <p className="text-sm text-red-600">{error}</p>
@@ -287,25 +389,136 @@ export default function AdminPage() {
                         <p className="text-sm text-gray-600">
                           {parseFloat(loc.latitude).toFixed(6)}, {parseFloat(loc.longitude).toFixed(6)}
                         </p>
+                        {loc.winning_amount && parseFloat(loc.winning_amount) > 0 && (
+                          <p className="text-sm text-green-600 font-semibold mt-1">
+                            ₹{parseFloat(loc.winning_amount).toFixed(2)}
+                          </p>
+                        )}
+                        <p className="text-sm text-blue-600 font-medium mt-1">
+                          Team Size: {loc.minimum_team_size || 1} {loc.minimum_team_size === 1 ? 'player' : 'players'}
+                        </p>
                         {loc.active && (
                           <span className="inline-block mt-1 px-2 py-1 bg-green-600 text-white text-xs rounded">
                             Active
                           </span>
                         )}
                       </div>
-                      <div>
-                        {!loc.active && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleSetActive(loc.id, e)}
-                            disabled={isLoading}
-                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {isLoading ? 'Setting...' : 'Set Active'}
-                          </button>
-                        )}
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => loc.active ? handleDeactivate(loc.id, e) : handleSetActive(loc.id, e)}
+                          disabled={isLoading}
+                          className={`px-4 py-2 text-white text-sm rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                            loc.active 
+                              ? 'bg-orange-600 hover:bg-orange-700' 
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
+                        >
+                          {isLoading ? 'Updating...' : loc.active ? 'Deactivate' : 'Set Active'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditingLocation(loc.id);
+                            setEditWinningAmount(loc.winning_amount?.toString() || '0');
+                            setEditMinimumTeamSize(loc.minimum_team_size?.toString() || '1');
+                          }}
+                          disabled={isLoading}
+                          className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDelete(loc.id, loc.name || 'Unnamed Location', e)}
+                          disabled={isLoading}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isLoading ? 'Deleting...' : 'Delete'}
+                        </button>
                       </div>
                     </div>
+                    {/* Edit Location Form */}
+                    {editingLocation === loc.id && (
+                      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Winning Amount (₹)
+                          </label>
+                          <input
+                            type="number"
+                            value={editWinningAmount}
+                            onChange={(e) => setEditWinningAmount(e.target.value)}
+                            placeholder="0"
+                            min="0"
+                            step="0.01"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Minimum Team Size
+                          </label>
+                          <input
+                            type="number"
+                            value={editMinimumTeamSize}
+                            onChange={(e) => setEditMinimumTeamSize(e.target.value)}
+                            placeholder="1"
+                            min="1"
+                            step="1"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            1 = Single player, 2 = Team of 2, 4 = Team of 4, etc.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setError('');
+                              setIsLoading(true);
+                              try {
+                                const amount = parseFloat(editWinningAmount) || 0;
+                                const teamSize = parseInt(editMinimumTeamSize) || 1;
+                                await updateLocation(loc.id, { 
+                                  winning_amount: amount,
+                                  minimum_team_size: teamSize
+                                });
+                                setEditingLocation(null);
+                                await loadLocations();
+                              } catch (err: any) {
+                                setError(err.message || 'Failed to update location');
+                              } finally {
+                                setIsLoading(false);
+                              }
+                            }}
+                            disabled={isLoading}
+                            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setEditingLocation(null);
+                              setEditWinningAmount('');
+                              setEditMinimumTeamSize('1');
+                            }}
+                            disabled={isLoading}
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
