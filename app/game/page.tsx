@@ -595,7 +595,7 @@ export default function GamePage() {
       
       // Check if result has error (already completed)
       if (result && 'error' in result) {
-        setError(result.error);
+        setError(result.error || 'An error occurred');
         setHasReached(false);
         return;
       }
