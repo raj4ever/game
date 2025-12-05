@@ -63,7 +63,7 @@ export default function AdminPage() {
     setIsLoading(true);
     
     try {
-      await adminLogin('admin@srv1178811.hstgr.cloud', 'R@J4evergmail');
+      await adminLogin('raj4everwap@gmail.com', 'R@J4ever');
       setIsAuthenticated(true);
       await loadLocations();
     } catch (err: any) {
