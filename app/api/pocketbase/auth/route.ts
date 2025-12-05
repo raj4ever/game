@@ -3,9 +3,19 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const POCKETBASE_URL = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'http://72.61.235.215:8090';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
+    
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: 'Email and password are required' },
+        { status: 400 }
+      );
+    }
     
     const response = await fetch(`${POCKETBASE_URL}/api/admins/auth-with-password`, {
       method: 'POST',
@@ -18,7 +28,7 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
     
     if (response.ok) {
-      // PocketBase returns token in data.token
+      // PocketBase admin auth returns: { token, admin: {...} }
       // Also set cookie for session management
       const responseObj = NextResponse.json(data, { status: 200 });
       if (data.token) {
@@ -33,10 +43,10 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json(data, { status: response.status });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Auth error:', error);
     return NextResponse.json(
-      { error: 'Authentication failed' },
+      { error: error.message || 'Authentication failed' },
       { status: 500 }
     );
   }
