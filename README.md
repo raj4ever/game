@@ -61,7 +61,7 @@ The HTTPS server will automatically create self-signed certificates on first run
 ## Usage
 
 1. **Admin Panel** (`/admin`): 
-   - Login with PocketBase credentials
+   - Login with Supabase credentials
    - Set target coordinates for the treasure
    - Manage multiple locations
 2. **Game Page** (`/game`): 
