@@ -198,10 +198,15 @@ export async function updateLocation(id: string, updates: {
 export async function setActiveLocation(id: string) {
   try {
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+    }
     if (!session) {
       throw new Error('You must be logged in to set active location');
     }
+
+    console.log('User authenticated, session:', session.user.email);
 
     // First, deactivate all locations
     const { error: deactivateError } = await supabase
@@ -212,6 +217,8 @@ export async function setActiveLocation(id: string) {
     if (deactivateError) {
       console.error('Error deactivating locations:', deactivateError);
       // Continue anyway - might be no active locations
+    } else {
+      console.log('All locations deactivated');
     }
 
     // Then activate the selected location
@@ -224,6 +231,7 @@ export async function setActiveLocation(id: string) {
 
     if (error) {
       console.error('Error activating location:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       // More detailed error message
       if (error.code === 'PGRST301' || error.message.includes('permission')) {
         throw new Error('Permission denied. Make sure you are logged in and have permission to update locations.');
@@ -232,9 +240,11 @@ export async function setActiveLocation(id: string) {
     }
 
     if (!data) {
-      throw new Error('Location not found');
+      console.error('No data returned from update');
+      throw new Error('Location not found or update failed');
     }
 
+    console.log('Location activated successfully:', data);
     return data;
   } catch (error: any) {
     console.error('Error setting active location:', error);

@@ -110,14 +110,10 @@ export default function AdminPage() {
       console.log('Setting active location:', locationId);
       const result = await setActiveLocation(locationId);
       console.log('Active location set:', result);
+      
       setError(''); // Clear any previous errors
-      // Force reload locations
+      // Force reload locations to get fresh data from database
       await loadLocations();
-      // Also refresh the page state
-      setLocations(prev => prev.map(loc => ({
-        ...loc,
-        active: loc.id === locationId
-      })));
     } catch (err: any) {
       console.error('Set active error:', err);
       setError(err.message || 'Failed to set active location. Make sure you are logged in.');
