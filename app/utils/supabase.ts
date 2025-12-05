@@ -226,21 +226,40 @@ export async function setActiveLocation(id: string) {
       .from('locations')
       .update({ active: true })
       .eq('id', id)
-      .select()
+      .select('*')
       .maybeSingle(); // Use maybeSingle to handle cases gracefully
 
     if (error) {
       console.error('Error activating location:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
       console.error('Error details:', JSON.stringify(error, null, 2));
       // More detailed error message
-      if (error.code === 'PGRST301' || error.message.includes('permission')) {
+      if (error.code === 'PGRST301' || error.message.includes('permission') || error.message.includes('row-level security')) {
         throw new Error('Permission denied. Make sure you are logged in and have permission to update locations.');
       }
       throw new Error(`Failed to set active location: ${error.message}`);
     }
 
     if (!data) {
-      console.error('No data returned from update');
+      console.warn('No data returned from update, but update might have succeeded');
+      // Try to fetch the location to verify it was updated
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      
+      if (verifyError) {
+        console.error('Error verifying location:', verifyError);
+        throw new Error('Location update may have failed. Please refresh and try again.');
+      }
+      
+      if (verifyData && verifyData.active) {
+        console.log('Location verified as active:', verifyData);
+        return verifyData;
+      }
+      
       throw new Error('Location not found or update failed');
     }
 
