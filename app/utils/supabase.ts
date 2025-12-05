@@ -4,8 +4,22 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
-// Create Supabase client (will work even with placeholder values during build)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create Supabase client with proper configuration
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  db: {
+    schema: 'public',
+  },
+  global: {
+    headers: {
+      'apikey': supabaseAnonKey,
+      'Content-Type': 'application/json',
+    },
+  },
+});
 
 // Admin authentication (using Supabase Auth)
 export async function adminLogin(email: string, password: string) {
@@ -64,17 +78,14 @@ export async function getActiveLocation() {
       .eq('active', true)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to handle no rows gracefully
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        // No rows returned
-        return null;
-      }
-      throw error;
+      console.error('Supabase error:', error);
+      return null;
     }
 
-    if (data) {
+    if (data && data.latitude && data.longitude) {
       return {
         lat: parseFloat(data.latitude),
         lon: parseFloat(data.longitude),
@@ -126,7 +137,8 @@ export async function getAllLocations() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      throw error;
+      console.error('Supabase error fetching locations:', error);
+      return [];
     }
 
     return data || [];

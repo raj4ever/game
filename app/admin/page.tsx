@@ -44,10 +44,10 @@ export default function AdminPage() {
   const loadLocations = async () => {
     try {
       const allLocations = await getAllLocations();
-      setLocations(allLocations);
+      setLocations(allLocations || []);
       
       const active = await getActiveLocation();
-      if (active) {
+      if (active && active.lat && active.lon) {
         setActiveLocation(active);
         setLat(active.lat.toString());
         setLon(active.lon.toString());
@@ -194,7 +194,7 @@ export default function AdminPage() {
           </p>
 
           {/* Active Location Info */}
-          {activeLocation && (
+          {activeLocation && activeLocation.lat && activeLocation.lon && (
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800">
                 <strong>Active Location:</strong> {activeLocation.lat.toFixed(6)}, {activeLocation.lon.toFixed(6)}
