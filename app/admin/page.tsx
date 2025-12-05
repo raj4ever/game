@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { pb, adminLogin, saveLocation, getAllLocations, getActiveLocation } from '../utils/pocketbase';
+import { adminLogin, saveLocation, getAllLocations, getActiveLocation, setAuthToken, clearAuthToken } from '../utils/pocketbase';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -18,7 +18,10 @@ export default function AdminPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        if (pb.authStore.isValid) {
+        // Check if token exists in localStorage
+        const token = localStorage.getItem('pb_auth_token');
+        if (token) {
+          setAuthToken(token);
           setIsAuthenticated(true);
           await loadLocations();
         } else {
@@ -55,7 +58,11 @@ export default function AdminPage() {
     setIsLoading(true);
     
     try {
-      await adminLogin('admin@srv1178811.hstgr.cloud', 'R@J4evergmail');
+      const authData = await adminLogin('admin@srv1178811.hstgr.cloud', 'R@J4evergmail');
+      // Store token in localStorage
+      if (authData.token) {
+        localStorage.setItem('pb_auth_token', authData.token);
+      }
       setIsAuthenticated(true);
       await loadLocations();
     } catch (err: any) {
@@ -156,7 +163,8 @@ export default function AdminPage() {
             </h1>
             <button
               onClick={() => {
-                pb.authStore.clear();
+                clearAuthToken();
+                localStorage.removeItem('pb_auth_token');
                 setIsAuthenticated(false);
               }}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"

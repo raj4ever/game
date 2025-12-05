@@ -1,17 +1,64 @@
 // PocketBase client utility
-import PocketBase from 'pocketbase';
+// Using custom API routes to avoid mixed content issues (HTTPS -> HTTP)
 
+const API_BASE = '/api/pocketbase';
 const POCKETBASE_URL = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'http://72.61.235.215:8090';
 
-// Create PocketBase client instance
-export const pb = new PocketBase(POCKETBASE_URL);
+// Store auth token
+let authToken: string | null = null;
+
+export function setAuthToken(token: string) {
+  authToken = token;
+}
+
+export function clearAuthToken() {
+  authToken = null;
+}
+
+function getAuthHeaders() {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  // Get token from state or localStorage
+  const token = authToken || (typeof window !== 'undefined' ? localStorage.getItem('pb_auth_token') : null);
+  if (token) {
+    // PocketBase expects Authorization header format: "Bearer {token}" or just the token
+    headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+  }
+  return headers;
+}
 
 // Admin authentication
 export async function adminLogin(email: string, password: string) {
   try {
-    const authData = await pb.admins.authWithPassword(email, password);
-    return authData;
-  } catch (error) {
+    const response = await fetch(`${API_BASE}/auth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+      credentials: 'include', // Include cookies
+    });
+
+    const data = await response.json();
+    
+    if (response.ok) {
+      // PocketBase admin auth returns: { token, admin: {...} }
+      const token = data.token;
+      if (token) {
+        setAuthToken(token);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pb_auth_token', token);
+        }
+        return data;
+      } else {
+        throw new Error('Token not received from server');
+      }
+    } else {
+      const errorMsg = data.message || data.error?.message || data.error || 'Login failed';
+      throw new Error(errorMsg);
+    }
+  } catch (error: any) {
     console.error('Admin login error:', error);
     throw error;
   }
@@ -20,13 +67,11 @@ export async function adminLogin(email: string, password: string) {
 // Get active location (first location)
 export async function getActiveLocation() {
   try {
-    const records = await pb.collection('locations').getList(1, 1, {
-      filter: 'active = true',
-      sort: '-created',
-    });
+    const response = await fetch(`${API_BASE}/locations?active=true`);
+    const data = await response.json();
     
-    if (records.items.length > 0) {
-      const location = records.items[0];
+    if (response.ok && data.items && data.items.length > 0) {
+      const location = data.items[0];
       return {
         lat: parseFloat(location.latitude),
         lon: parseFloat(location.longitude),
@@ -43,13 +88,18 @@ export async function getActiveLocation() {
 // Get location by ID
 export async function getLocationById(id: string) {
   try {
-    const record = await pb.collection('locations').getOne(id);
-    return {
-      lat: parseFloat(record.latitude),
-      lon: parseFloat(record.longitude),
-      id: record.id,
-      name: record.name || '',
-    };
+    const response = await fetch(`${API_BASE}/locations/${id}`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      return {
+        lat: parseFloat(data.latitude),
+        lon: parseFloat(data.longitude),
+        id: data.id,
+        name: data.name || '',
+      };
+    }
+    return null;
   } catch (error) {
     console.error('Error fetching location:', error);
     return null;
@@ -60,28 +110,37 @@ export async function getLocationById(id: string) {
 export async function saveLocation(lat: string, lon: string, name?: string) {
   try {
     // Check if active location exists
-    const existing = await pb.collection('locations').getList(1, 1, {
-      filter: 'active = true',
-    });
+    const existingResponse = await fetch(`${API_BASE}/locations?active=true`);
+    const existingData = await existingResponse.json();
 
-    if (existing.items.length > 0) {
+    if (existingData.items && existingData.items.length > 0) {
       // Update existing
-      const record = await pb.collection('locations').update(existing.items[0].id, {
-        latitude: lat,
-        longitude: lon,
-        name: name || 'Treasure Location',
-        active: true,
+      const response = await fetch(`${API_BASE}/locations/${existingData.items[0].id}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          latitude: lat,
+          longitude: lon,
+          name: name || 'Treasure Location',
+          active: true,
+        }),
       });
-      return record;
+      const data = await response.json();
+      return data;
     } else {
       // Create new
-      const record = await pb.collection('locations').create({
-        latitude: lat,
-        longitude: lon,
-        name: name || 'Treasure Location',
-        active: true,
+      const response = await fetch(`${API_BASE}/locations`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          latitude: lat,
+          longitude: lon,
+          name: name || 'Treasure Location',
+          active: true,
+        }),
       });
-      return record;
+      const data = await response.json();
+      return data;
     }
   } catch (error) {
     console.error('Error saving location:', error);
@@ -92,10 +151,13 @@ export async function saveLocation(lat: string, lon: string, name?: string) {
 // Get all locations
 export async function getAllLocations() {
   try {
-    const records = await pb.collection('locations').getFullList({
-      sort: '-created',
-    });
-    return records;
+    const response = await fetch(`${API_BASE}/locations`);
+    const data = await response.json();
+    
+    if (response.ok && data.items) {
+      return data.items;
+    }
+    return [];
   } catch (error) {
     console.error('Error fetching locations:', error);
     return [];
@@ -105,19 +167,25 @@ export async function getAllLocations() {
 // Verify code
 export async function verifyCode(code: string, locationId: string) {
   try {
-    const records = await pb.collection('codes').getList(1, 1, {
-      filter: `code = "${code.toUpperCase()}" && location_id = "${locationId}" && used = false`,
-    });
+    const response = await fetch(
+      `${API_BASE}/codes?code=${encodeURIComponent(code.toUpperCase())}&location_id=${locationId}&used=false`
+    );
+    const data = await response.json();
     
-    if (records.items.length > 0) {
+    if (response.ok && data.items && data.items.length > 0) {
+      const codeRecord = data.items[0];
+      
       // Mark code as used
-      await pb.collection('codes').update(records.items[0].id, {
-        used: true,
-        used_at: new Date().toISOString(),
+      await fetch(`${API_BASE}/codes/${codeRecord.id}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          used: true,
+          used_at: new Date().toISOString(),
+        }),
       });
       
       // Get next location
-      const codeRecord = records.items[0];
       if (codeRecord.next_location_id) {
         return await getLocationById(codeRecord.next_location_id);
       }
@@ -138,14 +206,24 @@ export async function generateCodeForLocation(locationId: string, nextLocationId
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     
-    const record = await pb.collection('codes').create({
-      code: code,
-      location_id: locationId,
-      next_location_id: nextLocationId || '',
-      used: false,
+    const response = await fetch(`${API_BASE}/codes`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        code: code,
+        location_id: locationId,
+        next_location_id: nextLocationId || '',
+        used: false,
+      }),
     });
     
-    return code;
+    const data = await response.json();
+    
+    if (response.ok) {
+      return code;
+    } else {
+      throw new Error(data.message || 'Failed to create code');
+    }
   } catch (error) {
     console.error('Error generating code:', error);
     throw error;
